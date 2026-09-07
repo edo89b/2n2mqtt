@@ -315,13 +315,27 @@ def wanted_ports():
     return [p for p in ports if p]
 
 
+# Last state published per port, so a transition can be logged without turning
+# the periodic re-publish into one log line a minute per input.
+_io_state = {}
+
+
 def publish_port(client, port, state):
     """Publish a port under its own id, and under its role name when it has one.
 
     A device may already call its input by the role name — the tamper input
     usually does — in which case the two topics are the same one and publishing
     it twice would only duplicate the traffic.
+
+    Transitions are logged. An input that changes between two polls is otherwise
+    only visible as a retained value that has already moved on, which makes
+    "did this input ever move?" impossible to answer after the fact — the one
+    question worth asking of a door contact or a tamper switch.
     """
+    if _io_state.get(port) != state:
+        if port in _io_state:
+            log(f"[io] {port}: {_io_state[port]} -> {state}")
+        _io_state[port] = state
     client.publish(f"{TOPIC_IO}/{port}", state, qos=0, retain=True)
     for role, mapped in (("tamper", PORT_TAMPER), ("door", PORT_DOOR)):
         if port == mapped and port != role:
@@ -463,8 +477,10 @@ def handle_event(client, ev):
         port = params.get("port")
         if port:
             publish_port(client, port, "ON" if params.get("state") else "OFF")
-    elif name == "TamperSwitchActivated" and PORT_TAMPER:
-        client.publish(f"{TOPIC_IO}/tamper", "ON", qos=0, retain=True)
+    elif name == "TamperSwitchActivated":
+        log(f"[io] tamper switch activated at {when}")
+        if PORT_TAMPER:
+            client.publish(f"{TOPIC_IO}/tamper", "ON", qos=0, retain=True)
     elif name == "DoorStateChanged" and PORT_DOOR:
         # The field is not documented as a fixed type: accept the spellings a
         # device may use rather than silently reading every door as closed.
