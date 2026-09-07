@@ -55,9 +55,13 @@ LOG_FILTER = os.environ.get("LOG_FILTER", "").strip() or ",".join([
     "DoorStateChanged",
     "DoorOpenTooLong",
     "InputChanged",
+    "RexActivated",
     "UserAuthenticated",
-    "CardEntered",
+    "UserRejected",
     "AccessTaken",
+    "AccessBlocked",
+    "AccessLimited",
+    "CardEntered",
 ])
 
 # Event names differ between firmware families; keep them configurable rather
@@ -65,7 +69,13 @@ LOG_FILTER = os.environ.get("LOG_FILTER", "").strip() or ",".join([
 GRANTED_EVENTS = {e for e in os.environ.get(
     "ACCESS_GRANTED_EVENTS", "UserAuthenticated,AccessTaken").split(",") if e}
 DENIED_EVENTS = {e for e in os.environ.get(
-    "ACCESS_DENIED_EVENTS", "UserRejected,AccessDenied,UnauthorizedDoorOpen").split(",") if e}
+    "ACCESS_DENIED_EVENTS",
+    "UserRejected,AccessBlocked,AccessLimited,UnauthorizedDoorOpen").split(",") if e}
+
+# Whatever is named in GRANTED_EVENTS or DENIED_EVENTS has to appear in
+# LOG_FILTER too, otherwise the subscription simply never delivers it and the
+# classification below is never reached.
+_unsubscribed = (GRANTED_EVENTS | DENIED_EVENTS) - set(LOG_FILTER.split(","))
 
 # --- Features ---------------------------------------------------------------
 ENABLE_IO = os.environ.get("ENABLE_IO", "true").lower() == "true"
@@ -195,13 +205,13 @@ class ApiError(Exception):
         return any(k in text for k in ("privilege", "licen", "not supported", "unsupported"))
 
 
-def get(path, **params):
+def get(path, _timeout=None, **params):
     """GET an API endpoint and return its `result`.
 
     The device answers HTTP 200 even for application errors, so the `success`
     field is the real outcome and is what decides here.
     """
-    r = api.get(f"{API}{path}", params=params or None, timeout=TIMEOUT)
+    r = api.get(f"{API}{path}", params=params or None, timeout=_timeout or TIMEOUT)
     if r.status_code in (401, 403):
         raise AuthError(f"HTTP {r.status_code} on {path}: check TWON_USER / TWON_PASS "
                         f"and that the account has the Monitoring and I/O privileges")
@@ -408,10 +418,18 @@ def subscribe():
 
 
 def pull(sid, blocking):
+    """One page of events.
+
+    A blocking pull is held open by the device for up to LOG_LONG_POLL seconds,
+    so the HTTP read timeout has to outlast it — with the ordinary timeout every
+    quiet period would look like a failure.
+    """
     params = {"id": sid}
+    timeout = None
     if blocking and LOG_LONG_POLL > 0:
         params["timeout"] = LOG_LONG_POLL
-    return get("/log/pull", **params).get("events") or []
+        timeout = LOG_LONG_POLL + TIMEOUT
+    return get("/log/pull", _timeout=timeout, **params).get("events") or []
 
 
 def classify(event_name, params):
@@ -444,8 +462,11 @@ def handle_event(client, ev):
     elif name == "TamperSwitchActivated" and PORT_TAMPER:
         client.publish(f"{TOPIC_IO}/tamper", "ON", qos=0, retain=True)
     elif name == "DoorStateChanged" and PORT_DOOR:
-        client.publish(f"{TOPIC_IO}/door",
-                       "ON" if params.get("state") == "open" else "OFF", qos=0, retain=True)
+        # The field is not documented as a fixed type: accept the spellings a
+        # device may use rather than silently reading every door as closed.
+        raw_state = params.get("state")
+        opened = raw_state in ("open", "opened", 1, True, "1", "true")
+        client.publish(f"{TOPIC_IO}/door", "ON" if opened else "OFF", qos=0, retain=True)
 
     if not ENABLE_ACCESS_LOG:
         return
@@ -520,10 +541,12 @@ def log_loop(client, stop):
             stop.wait(backoff)
             backoff = min(backoff * 2, 60)
         except Exception as e:
-            # The device is unreachable rather than refusing: back off instead of
-            # retrying the subscription every few seconds while it is down.
+            # A transport failure says nothing about the subscription, which stays
+            # valid on the device with our events queued behind it. Dropping it
+            # here would orphan a queue and lose whatever it still held; if it
+            # really is gone, the next pull says so and the branch above recreates
+            # it. Back off meanwhile rather than retrying every few seconds.
             log(f"[log] {short(e)}; retrying in {backoff}s")
-            sid = None
             stop.wait(backoff)
             backoff = min(backoff * 2, 60)
     unsubscribe(sid)
@@ -552,6 +575,9 @@ def main():
     client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
     client.loop_start()
     log(f"[mqtt] {MQTT_HOST}:{MQTT_PORT} as {MQTT_USER or 'anonymous'}, base={BASE}")
+    if _unsubscribed:
+        log(f"[config] these access events are classified but not subscribed, so they "
+            f"will never arrive; add them to LOG_FILTER: {sorted(_unsubscribed)}")
     log(f"[2n] {SCHEME}://{HOST} as {USER or 'anonymous'}, "
         f"io={'on' if ENABLE_IO else 'off'}, log={'on' if ENABLE_ACCESS_LOG else 'off'}")
 

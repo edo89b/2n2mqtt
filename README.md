@@ -101,6 +101,17 @@ docker compose up -d --build
 docker logs -f 2n2mqtt
 ```
 
+**Quote any password containing `$`.** Compose expands `$NAME` inside unquoted
+`.env` values, so `TWON_PASS=$ecret1` reaches the container as an empty string
+and every request comes back 401 while the file on disk looks correct. Single
+quotes are taken literally:
+
+```
+TWON_PASS='$ecret1'
+```
+
+Check what actually arrived with `docker exec 2n2mqtt printenv TWON_PASS`.
+
 If the device is not reachable over the default bridge network, or your broker
 has its own internal network:
 
