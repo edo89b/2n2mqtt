@@ -1,0 +1,16 @@
+# Plain single-network deployment: the container reaches both the 2N device and
+# the broker over the default bridge. If the device sits on a network the default
+# bridge cannot reach, or the broker has its own internal network, copy
+# docker-compose.override.yml.example to docker-compose.override.yml and fill in
+# the network variables in .env.
+services:
+  2n2mqtt:
+    build: .
+    container_name: 2n2mqtt
+    restart: unless-stopped
+    env_file: .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

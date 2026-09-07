@@ -1,0 +1,33 @@
+# Optional networking. Compose loads docker-compose.override.yml automatically,
+# so copy this file to that name to enable it:
+#
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# Use it when the 2N device lives on a network the default bridge cannot reach
+# (a macvlan on the device's own VLAN, say) and the broker exposes an internal
+# network of its own. Every value comes from .env, so this file holds no
+# deployment detail itself.
+#
+#   DEVICE_NET_NAME  existing docker network that can reach the 2N
+#   BROKER_NET_NAME  existing docker network shared with the MQTT broker
+#   BRIDGE_IPV4      address for this container on DEVICE_NET_NAME
+#   BRIDGE_IPV6      same, IPv6; drop the line if the network has no IPv6
+#
+# On a container attached to several networks, point MQTT_HOST at a name that
+# resolves only on the broker network, otherwise the traffic may leave through
+# the wrong interface.
+services:
+  2n2mqtt:
+    networks:
+      device_net:
+        ipv4_address: "${BRIDGE_IPV4}"
+        ipv6_address: "${BRIDGE_IPV6}"
+      broker_net:
+
+networks:
+  device_net:
+    name: "${DEVICE_NET_NAME}"
+    external: true
+  broker_net:
+    name: "${BROKER_NET_NAME}"
+    external: true

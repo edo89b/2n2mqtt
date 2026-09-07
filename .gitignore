@@ -1,0 +1,14 @@
+# Secrets and local deployment detail. Backup copies of .env hold the same
+# credentials, and this repository is public.
+.env
+.env.*
+!.env.example
+
+# Local networking, specific to one installation.
+docker-compose.override.yml
+
+*.bak
+*.bak-*
+
+__pycache__/
+*.py[cod]
