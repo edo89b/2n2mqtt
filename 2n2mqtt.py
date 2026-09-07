@@ -315,6 +315,19 @@ def wanted_ports():
     return [p for p in ports if p]
 
 
+def publish_port(client, port, state):
+    """Publish a port under its own id, and under its role name when it has one.
+
+    A device may already call its input by the role name — the tamper input
+    usually does — in which case the two topics are the same one and publishing
+    it twice would only duplicate the traffic.
+    """
+    client.publish(f"{TOPIC_IO}/{port}", state, qos=0, retain=True)
+    for role, mapped in (("tamper", PORT_TAMPER), ("door", PORT_DOOR)):
+        if port == mapped and port != role:
+            client.publish(f"{TOPIC_IO}/{role}", state, qos=0, retain=True)
+
+
 def publish_io(client, ports):
     """Read every wanted port and publish it, plus the tamper/door role aliases.
 
@@ -333,11 +346,7 @@ def publish_io(client, ports):
         if not entries:
             continue
         state = "ON" if entries[0].get("state") else "OFF"
-        client.publish(f"{TOPIC_IO}/{port}", state, qos=0, retain=True)
-        if port == PORT_TAMPER:
-            client.publish(f"{TOPIC_IO}/tamper", state, qos=0, retain=True)
-        if port == PORT_DOOR:
-            client.publish(f"{TOPIC_IO}/door", state, qos=0, retain=True)
+        publish_port(client, port, state)
 
 
 def io_loop(client, state, stop):
@@ -453,12 +462,7 @@ def handle_event(client, ev):
     if name == "InputChanged":
         port = params.get("port")
         if port:
-            state = "ON" if params.get("state") else "OFF"
-            client.publish(f"{TOPIC_IO}/{port}", state, qos=0, retain=True)
-            if port == PORT_TAMPER:
-                client.publish(f"{TOPIC_IO}/tamper", state, qos=0, retain=True)
-            if port == PORT_DOOR:
-                client.publish(f"{TOPIC_IO}/door", state, qos=0, retain=True)
+            publish_port(client, port, "ON" if params.get("state") else "OFF")
     elif name == "TamperSwitchActivated" and PORT_TAMPER:
         client.publish(f"{TOPIC_IO}/tamper", "ON", qos=0, retain=True)
     elif name == "DoorStateChanged" and PORT_DOOR:
