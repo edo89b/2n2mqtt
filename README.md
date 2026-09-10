@@ -74,7 +74,7 @@ Everything is configured through the environment; see `.env.example`.
 | `LOG_POLL_INTERVAL` | `3` | Interval used when long-polling is disabled |
 | `LOG_FILTER` | built-in list | Event types to subscribe to |
 | `ACCESS_GRANTED_EVENTS` | `UserAuthenticated,AccessTaken` | Events counted as granted |
-| `ACCESS_DENIED_EVENTS` | `UserRejected,AccessDenied,UnauthorizedDoorOpen` | Events counted as denied |
+| `ACCESS_DENIED_EVENTS` | `UserRejected,AccessBlocked,AccessLimited,UnauthorizedDoorOpen` | Events counted as denied |
 | `ENABLE_IO`, `ENABLE_ACCESS_LOG`, `ENABLE_DISCOVERY` | `true` | Feature switches |
 | `IO_PORT_TAMPER`, `IO_PORT_DOOR` | — | Port ids from `/api/io/caps` |
 | `IO_PORTS_EXTRA` | — | Further ports, comma-separated |

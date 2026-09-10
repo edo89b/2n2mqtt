@@ -1,0 +1,17 @@
+# 2n2mqtt
+
+> Read-only bridge from a 2N IP intercom or Access Unit to MQTT, with Home Assistant discovery. One Python process in one Docker container: it reads the device over its HTTP API (Digest authentication) through an event-log subscription plus a slow poll, and publishes inputs, tamper, door contact, access events and device health as MQTT topics. It never drives an output. MIT licensed.
+
+## Docs
+
+- [AGENTS.md](AGENTS.md): conventions, commands, git workflow, secrets, known technical debt
+- [README.md](README.md): overview, published topics, full configuration table
+- [Architecture](docs/ARCHITECTURE.md): components, data flow, error model, design decisions, load on the device
+- [Setup](docs/SETUP.md): installation, networking override, verification, troubleshooting, operational traps
+- [Interfaces](docs/API.md): MQTT topics, Home Assistant discovery entities, census of the 2N HTTP API endpoints and events
+
+## Optional
+
+- [.env.example](.env.example): every setting with its default and a comment
+- [docker-compose.override.yml.example](docker-compose.override.yml.example): optional networking template
+- [LICENSE](LICENSE): MIT
