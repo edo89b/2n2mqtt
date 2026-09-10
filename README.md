@@ -34,13 +34,20 @@ rejected badge into a new alert.
 <STATE_PREFIX>/io/tamper         ON | OFF           (alias of IO_PORT_TAMPER)
 <STATE_PREFIX>/io/door           ON | OFF           (alias of IO_PORT_DOOR)
 <STATE_PREFIX>/access/user       last user, or an opaque id
-<STATE_PREFIX>/access/time       ISO 8601
+<STATE_PREFIX>/access/time       device utcTime as sent (epoch seconds, see below)
 <STATE_PREFIX>/access/result     granted | denied
 <STATE_PREFIX>/access/event      JSON, not retained
 ```
 
 Home Assistant discovery is published under
 `<DISCOVERY_PREFIX>/<component>/<DEVICE_ID>/<key>/config`.
+
+`access/time` carries the event's `utcTime` (or `time`, when that is missing)
+exactly as the device sends it: Unix epoch seconds on the verified firmware,
+not ISO 8601. The discovery entity declares it a `timestamp`, so Home Assistant
+rejects every value and "Last access" stays unknown. This is a known defect of
+the bridge, see [Operational traps](docs/SETUP.md#operational-traps); consumers
+that need the time can convert the epoch themselves.
 
 ## Before you start
 
@@ -110,7 +117,11 @@ quotes are taken literally:
 TWON_PASS='$ecret1'
 ```
 
-Check what actually arrived with `docker exec 2n2mqtt printenv TWON_PASS`.
+Check that the password did not arrive empty, without printing it:
+
+```bash
+docker exec 2n2mqtt sh -c 'test -n "$TWON_PASS" && echo set || echo EMPTY'
+```
 
 If the device is not reachable over the default bridge network, or your broker
 has its own internal network:
