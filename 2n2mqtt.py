@@ -20,6 +20,7 @@ privilege or licence error the corresponding feature is switched off for the res
 of the run instead of being retried or worked around.
 """
 import hashlib
+import datetime
 import json
 import os
 import signal
@@ -466,10 +467,26 @@ def classify(event_name, params):
     return None
 
 
+def iso_time(ev):
+    """Event time as ISO 8601 UTC.
+
+    The device reports `utcTime` as a Unix epoch and `time` as a string. The
+    access_time entity is declared with device_class "timestamp", and Home
+    Assistant rejects an epoch there ("Invalid state message ... from
+    2n/<dev>/access/time"), so the epoch is converted instead of published raw.
+    """
+    raw = ev.get("utcTime") or ev.get("time") or ""
+    try:
+        return datetime.datetime.fromtimestamp(
+            float(raw), datetime.timezone.utc).isoformat(timespec="seconds")
+    except (TypeError, ValueError):
+        return str(raw)
+
+
 def handle_event(client, ev):
     name = ev.get("event", "")
     params = ev.get("params") or {}
-    when = ev.get("utcTime") or ev.get("time") or ""
+    when = iso_time(ev)
 
     # Input transitions reported by the device arrive here too, ahead of the
     # next slow poll.

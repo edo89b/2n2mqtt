@@ -116,9 +116,6 @@ Anti-patterns (never acceptable):
 
 Known technical debt (documented, not fixed yet):
 
-- `access/time` carries the device's `utcTime` as sent (Unix epoch seconds on
-  the verified firmware), while discovery declares it a `timestamp`: Home
-  Assistant rejects every value ("Invalid state message").
 - `.env.example` and the code disagree: `.env.example` sets
   `ACCESS_DENIED_EVENTS` with `AccessDenied`, which `/api/log/caps` does not
   list on the verified firmware, and without `AccessBlocked`/`AccessLimited`

@@ -159,11 +159,12 @@ One entry per failure that actually happened.
    `AccessBlocked`/`AccessLimited`: a fresh copy
    logs the `[config]` warning and does not count those two events as denied
    unless they carry a `valid` field. Use the value given in step 3 of Install.
-3. **"Last access" stays unknown in Home Assistant.** `access/time` carries
-   Unix epoch seconds while the entity is a `timestamp`; Home Assistant logs
-   `Invalid state message '<epoch>' from '<STATE_PREFIX>/access/time'` on
-   every badge. Known defect in the bridge; `access/event` has the same value
-   for consumers that convert it.
+3. **"Last access" stays unknown in Home Assistant.** Fixed on 16/09/2026:
+   `iso_time()` converts the device's `utcTime` (Unix epoch seconds) to ISO
+   8601 UTC before publishing, on both `access/time` and `access/event`.
+   Before that Home Assistant logged `Invalid state message '<epoch>' from
+   '<STATE_PREFIX>/access/time'` on every badge, because the entity is
+   declared a `timestamp`.
 4. **Isolated 401 with correct credentials.** A single
    `authentication rejected: HTTP 401 on /system/status` followed by
    `reachable -> online` on the next cycle has been observed with a working
